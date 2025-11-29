@@ -21,6 +21,8 @@ export default {
       return await handleApi(request, env);
     } else if (url.pathname === "/ably") {
       return await handleAblyWebhook(request, env);
+    } else if (url.pathname === "/meta") {
+      return handleMeta(env);
     } else {
       return new Response("Not Found", { status: 404 });
     }
@@ -31,24 +33,20 @@ export default {
 async function handleApiRequest(requestId, payload) {
   const { service, instance, level, message } = payload;
 
-  // Validate
   if (!service || !instance || level === undefined || !message) {
     return nack(requestId, "MissingField", "Missing fields in payload: service, instance, level, message");
   }
 
-  // Save to DB
   await G_DB.prepare(
     `INSERT INTO log1 (c1, c2, i1, t1) VALUES (?, ?, ?, ?)`
   ).bind(service, instance, level, message).run();
 
-  // Optional: forward notification (only for high levels)
   if (level >= 3) {
     await messageTelegram(payload);
   }
   return ack(requestId);
 }
 async function handleApi(request, env) {
-  // Auth check
   const auth = request.headers.get("Authorization");
   if (!auth || !auth.startsWith("Bearer ")) {
     return nack("unknown", "UNAUTHORIZED", "Missing or invalid Authorization header");
@@ -59,7 +57,6 @@ async function handleApi(request, env) {
     return nack("unknown", "INVALID_TOKEN", "Token authentication failed");
   }
 
-  // Parse body
   let body;
   try {
     body = await request.json();
@@ -124,10 +121,9 @@ async function handleAblyWebhook(request, env) {
         continue;
       }
 
-      // ✅ CHECK payload exists, not null, and is object
       const payload = msgpayload?.payload;
       if (!payload || typeof payload !== "object") {
-        continue; // ❗ don't call handleApiRequest
+        continue;
       }
 
       try {
@@ -144,6 +140,19 @@ async function handleAblyWebhook(request, env) {
     await errDelegate(`Webhook error: ${err.message}`);
     return new Response("Internal Server Error", { status: 500 });
   }
+}
+/////////////////////////   Meta Endpoint   /////////////////////////
+function handleMeta(env) {
+  const instance =
+    env.INSTANCEID && env.INSTANCEID.trim() !== ""
+      ? env.INSTANCEID.trim()
+      : G_INSTANCE;
+
+  return jsonResponse({
+    service: C_SERVICE,
+    version: C_VERSION,
+    instance,
+  });
 }
 
 
@@ -209,5 +218,8 @@ async function notifyTextTelegram(logData) {
 }
 
 /////////////////////////   Globals   /////////////////////////
+const C_SERVICE="da-cloud-log-service-cf";
+const C_VERSION = "0.0.1";
 let G_DB = null;
 let G_ENV = null;
+let G_INSTANCE="default";

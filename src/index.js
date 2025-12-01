@@ -53,7 +53,7 @@ async function handleApi(request, env) {
   }
 
   const token = auth.split(" ")[1];
-  if (token !== env.DA_WRITETOKEN) {
+  if (token !== env.DA_WRITE_TOKEN) {
     return nack("unknown", "INVALID_TOKEN", "Token authentication failed");
   }
 

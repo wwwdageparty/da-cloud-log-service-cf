@@ -11,7 +11,7 @@ database_name = "d1 database name"
 database_id = "d1 database id"
 
 [vars]
-DA_WRITETOKEN = "Demo111+"
+DA_WRITE_TOKEN = "Demo111+"
 
 [observability]
 enabled = true
